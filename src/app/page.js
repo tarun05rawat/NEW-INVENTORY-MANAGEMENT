@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { firestore, storage } from "@/firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { v4 } from "uuid";
+import axios from "axios";
 import {
   Box,
   Modal,
@@ -14,6 +15,9 @@ import {
   Card,
   CardContent,
   Container,
+  Checkbox,
+  FormControlLabel,
+  CircularProgress,
 } from "@mui/material";
 import {
   query,
@@ -25,12 +29,17 @@ import {
   getDoc,
 } from "firebase/firestore";
 
+const SPOONACULAR_API_KEY = "074a45a2489e444bab35e496e5d8e140";
+
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
   const [itemName, setItemName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [currentItem, setCurrentItem] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [recipes, setRecipes] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const updateInventory = async () => {
     const snapshot = query(collection(firestore, "inventory"));
@@ -123,6 +132,26 @@ export default function Home() {
   const handleUploadClick = (item) => {
     setCurrentItem(item);
     document.getElementById(`fileInput-${item.name}`).click();
+  };
+
+  const handleSelectItem = (item) => {
+    setSelectedItems((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleGenerateRecipes = async () => {
+    setLoading(true);
+    try {
+      const ingredients = selectedItems.join(",+");
+      const response = await axios.get(
+        `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${ingredients}&number=5&apiKey=${SPOONACULAR_API_KEY}`
+      );
+      setRecipes(response.data);
+    } catch (error) {
+      console.error("Error fetching recipes: ", error);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -247,6 +276,15 @@ export default function Home() {
                     {item.imageUrl && (
                       <img src={item.imageUrl} alt={item.name} width="100%" />
                     )}
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={selectedItems.includes(item.name)}
+                          onChange={() => handleSelectItem(item.name)}
+                        />
+                      }
+                      label="Select"
+                    />
                     <Typography variant="h5" textTransform={"capitalize"}>
                       {item.name}
                     </Typography>
@@ -280,6 +318,47 @@ export default function Home() {
             </Grid>
           ))}
         </Grid>
+        <Box display="flex" justifyContent="center" mt={4}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleGenerateRecipes}
+            disabled={selectedItems.length === 0}
+          >
+            Generate Recipes
+          </Button>
+        </Box>
+        {loading && (
+          <Box display="flex" justifyContent="center" mt={4}>
+            <CircularProgress />
+          </Box>
+        )}
+        <Box mt={4}>
+          {recipes.map((recipe) => (
+            <Card key={recipe.id} sx={{ marginBottom: 2 }}>
+              <CardContent>
+                <Typography variant="h6">{recipe.title}</Typography>
+                <img
+                  src={recipe.image}
+                  alt={recipe.title}
+                  style={{ width: "100%" }}
+                />
+                <Typography>Used Ingredients:</Typography>
+                <ul>
+                  {recipe.usedIngredients.map((ingredient) => (
+                    <li key={ingredient.id}>{ingredient.name}</li>
+                  ))}
+                </ul>
+                <Typography>Missed Ingredients:</Typography>
+                <ul>
+                  {recipe.missedIngredients.map((ingredient) => (
+                    <li key={ingredient.id}>{ingredient.name}</li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ))}
+        </Box>
       </Container>
     </Container>
   );
