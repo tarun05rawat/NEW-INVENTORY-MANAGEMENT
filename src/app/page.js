@@ -1,95 +1,286 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useState, useEffect } from "react";
+import { firestore, storage } from "@/firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 } from "uuid";
+import {
+  Box,
+  Modal,
+  Stack,
+  TextField,
+  Typography,
+  Button,
+  Grid,
+  Card,
+  CardContent,
+  Container,
+} from "@mui/material";
+import {
+  query,
+  collection,
+  getDocs,
+  doc,
+  deleteDoc,
+  setDoc,
+  getDoc,
+} from "firebase/firestore";
 
 export default function Home() {
+  const [inventory, setInventory] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [itemName, setItemName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentItem, setCurrentItem] = useState(null);
+
+  const updateInventory = async () => {
+    const snapshot = query(collection(firestore, "inventory"));
+    const docs = await getDocs(snapshot);
+    const inventoryList = [];
+    docs.forEach((doc) => {
+      inventoryList.push({
+        name: doc.id,
+        ...doc.data(),
+      });
+    });
+    setInventory(inventoryList);
+    console.log(inventoryList);
+  };
+
+  const clearInventory = async () => {
+    const itemsRef = collection(firestore, "inventory");
+    const items = await getDocs(itemsRef);
+
+    for (const item of items.docs) {
+      await deleteDoc(doc(firestore, "inventory", item.id));
+    }
+
+    await updateInventory();
+  };
+
+  const addItems = async (item) => {
+    const docRef = doc(collection(firestore, "inventory"), item);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const { quantity, imageUrl } = docSnap.data();
+      await setDoc(
+        docRef,
+        { quantity: quantity + 1, imageUrl },
+        { merge: true }
+      );
+    } else {
+      await setDoc(docRef, { quantity: 1 });
+    }
+
+    await updateInventory();
+  };
+
+  const handleOpen = () => {
+    setOpen(true);
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+  };
+
+  const removeItems = async (item) => {
+    const docRef = doc(collection(firestore, "inventory"), item);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const { quantity, imageUrl } = docSnap.data();
+      if (quantity === 1) {
+        await deleteDoc(docRef);
+      } else {
+        await setDoc(
+          docRef,
+          { quantity: quantity - 1, imageUrl },
+          { merge: true }
+        );
+      }
+    }
+
+    await updateInventory();
+  };
+
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const imageRef = ref(
+      storage,
+      `inventory_images/${currentItem.name + v4()}`
+    );
+    await uploadBytes(imageRef, file);
+    const imageUrl = await getDownloadURL(imageRef);
+
+    const docRef = doc(collection(firestore, "inventory"), currentItem.name);
+    await setDoc(docRef, { imageUrl }, { merge: true });
+
+    await updateInventory();
+  };
+
+  const handleUploadClick = (item) => {
+    setCurrentItem(item);
+    document.getElementById(`fileInput-${item.name}`).click();
+  };
+
+  useEffect(() => {
+    updateInventory();
+  }, []);
+
+  const filteredInventory = inventory.filter((item) =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <main className={styles.main}>
-      <div className={styles.description}>
-        <p>
-          Get started by editing&nbsp;
-          <code className={styles.code}>src/app/page.js</code>
-        </p>
-        <div>
-          <a
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{" "}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className={styles.vercelLogo}
-              width={100}
-              height={24}
-              priority
+    <Container>
+      <Modal open={open} onClose={handleClose}>
+        <Box
+          position="absolute"
+          top="50%"
+          left="50%"
+          width={400}
+          bgcolor="white"
+          border="2px solid #000"
+          boxShadow={24}
+          p={4}
+          display="flex"
+          flexDirection="column"
+          gap={3}
+          sx={{ transform: "translate(-50%, -50%)" }}
+        >
+          <Typography variant="h6">Add Item</Typography>
+          <Stack width="100%" direction="row" spacing={2}>
+            <TextField
+              variant="outlined"
+              fullWidth
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
             />
-          </a>
-        </div>
-      </div>
-
-      <div className={styles.center}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
+            <Button
+              variant="outlined"
+              onClick={() => {
+                addItems(itemName);
+                setItemName("");
+                handleClose();
+              }}
+            >
+              Add
+            </Button>
+          </Stack>
+        </Box>
+      </Modal>
+      <Container>
+        <Typography
+          variant="h3"
+          letterSpacing={5}
+          paddingTop="200px"
+          paddingLeft={30}
+          paddingRight={30}
+          paddingBottom={10}
+        >
+          Inventory Management
+        </Typography>
+        <TextField
+          variant="outlined"
+          fullWidth
+          placeholder="Search items..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ marginBottom: "20px" }}
         />
-      </div>
-
-      <div className={styles.grid}>
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
+      </Container>
+      <Box
+        display={"flex"}
+        flexDirection={"row"}
+        justifyContent={"center"}
+        alignItems={"center"}
+      >
+        <Box
+          display="flex"
+          justifyContent="center"
+          padding={2}
+          marginBottom={10}
         >
-          <h2>
-            Docs <span>-&gt;</span>
-          </h2>
-          <p>Find in-depth information about Next.js features and API.</p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
+          <Button variant="outlined" onClick={() => handleOpen()}>
+            Add New Item
+          </Button>
+        </Box>
+        <Box
+          display="flex"
+          justifyContent="center"
+          padding={2}
+          marginBottom={10}
         >
-          <h2>
-            Learn <span>-&gt;</span>
-          </h2>
-          <p>Learn about Next.js in an interactive course with&nbsp;quizzes!</p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Templates <span>-&gt;</span>
-          </h2>
-          <p>Explore starter templates for Next.js.</p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className={styles.card}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2>
-            Deploy <span>-&gt;</span>
-          </h2>
-          <p>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+          <Button variant="outlined" onClick={clearInventory}>
+            Clear Inventory
+          </Button>
+        </Box>
+      </Box>
+      <Container>
+        <Grid container>
+          {filteredInventory.map((item) => (
+            <Grid item xs={12} sm={6} md={3} key={item.name}>
+              <Card>
+                <CardContent>
+                  <Box
+                    display={"flex"}
+                    flexDirection={"column"}
+                    alignItems={"center"}
+                    gap={3}
+                  >
+                    <input
+                      type="file"
+                      id={`fileInput-${item.name}`}
+                      style={{ display: "none" }}
+                      accept="image/*"
+                      capture="camera"
+                      onChange={handleFileChange}
+                    />
+                    <Button
+                      variant="outlined"
+                      onClick={() => handleUploadClick(item)}
+                    >
+                      Upload Image
+                    </Button>
+                    {item.imageUrl && (
+                      <img src={item.imageUrl} alt={item.name} width="100%" />
+                    )}
+                    <Typography variant="h5" textTransform={"capitalize"}>
+                      {item.name}
+                    </Typography>
+                    <Typography variant="h9">
+                      Quantity: {item.quantity}
+                    </Typography>
+                    <Box
+                      display={"flex"}
+                      flexDirection={"row"}
+                      justifyContent={"center"}
+                      gap={3}
+                    >
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => addItems(item.name)}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={() => removeItems(item.name)}
+                      >
+                        Remove
+                      </Button>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      </Container>
+    </Container>
   );
 }
