@@ -210,7 +210,7 @@ export default function Home() {
           paddingRight={30}
           paddingBottom={10}
         >
-          Inventory Management
+          StockSmart
         </Typography>
         <TextField
           variant="outlined"
