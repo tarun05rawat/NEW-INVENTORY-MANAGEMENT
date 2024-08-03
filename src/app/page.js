@@ -206,7 +206,7 @@ export default function Home() {
           variant="h3"
           letterSpacing={5}
           paddingTop="200px"
-          paddingLeft={30}
+          paddingLeft={52}
           paddingRight={30}
           paddingBottom={10}
         >
