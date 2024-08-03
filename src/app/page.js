@@ -29,8 +29,6 @@ import {
   getDoc,
 } from "firebase/firestore";
 
-const SPOONACULAR_API_KEY = "074a45a2489e444bab35e496e5d8e140";
-
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
@@ -144,9 +142,11 @@ export default function Home() {
     setLoading(true);
     try {
       const ingredients = selectedItems.join(",+");
+      console.log("Selected Ingredients: ", ingredients); // Debugging
       const response = await axios.get(
-        `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${ingredients}&number=5&apiKey=${SPOONACULAR_API_KEY}`
+        `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${ingredients}&number=5&apiKey=${process.env.NEXT_PUBLIC_SPOONACULAR_API_KEY}`
       );
+      console.log("API Response: ", response.data); // Debugging
       setRecipes(response.data);
     } catch (error) {
       console.error("Error fetching recipes: ", error);
