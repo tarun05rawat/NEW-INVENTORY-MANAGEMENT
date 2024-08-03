@@ -29,7 +29,7 @@ import {
   getDoc,
 } from "firebase/firestore";
 
-NEXT_PUBLIC_SPOONACULAR_API_KEY = "074a45a2489e444bab35e496e5d8e140";
+const NEXT_PUBLIC_SPOONACULAR_API_KEY = "074a45a2489e444bab35e496e5d8e140";
 export default function Home() {
   const [inventory, setInventory] = useState([]);
   const [open, setOpen] = useState(false);
