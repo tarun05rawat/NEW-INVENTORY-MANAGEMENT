@@ -51,108 +51,6 @@ export default function Home() {
       });
     });
     setInventory(inventoryList);
-    console.log(inventoryList);
-  };
-
-  const clearInventory = async () => {
-    const itemsRef = collection(firestore, "inventory");
-    const items = await getDocs(itemsRef);
-
-    for (const item of items.docs) {
-      await deleteDoc(doc(firestore, "inventory", item.id));
-    }
-
-    await updateInventory();
-  };
-
-  const addItems = async (item) => {
-    const docRef = doc(collection(firestore, "inventory"), item);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const { quantity, imageUrl } = docSnap.data();
-      await setDoc(
-        docRef,
-        { quantity: quantity + 1, imageUrl },
-        { merge: true }
-      );
-    } else {
-      await setDoc(docRef, { quantity: 1 });
-    }
-
-    await updateInventory();
-  };
-
-  const handleOpen = () => {
-    setOpen(true);
-  };
-
-  const handleClose = () => {
-    setOpen(false);
-  };
-
-  const removeItems = async (item) => {
-    const docRef = doc(collection(firestore, "inventory"), item);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const { quantity, imageUrl } = docSnap.data();
-      if (quantity === 1) {
-        await deleteDoc(docRef);
-      } else {
-        await setDoc(
-          docRef,
-          { quantity: quantity - 1, imageUrl },
-          { merge: true }
-        );
-      }
-    }
-
-    await updateInventory();
-  };
-
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const imageRef = ref(
-      storage,
-      `inventory_images/${currentItem.name + v4()}`
-    );
-    await uploadBytes(imageRef, file);
-    const imageUrl = await getDownloadURL(imageRef);
-
-    const docRef = doc(collection(firestore, "inventory"), currentItem.name);
-    await setDoc(docRef, { imageUrl }, { merge: true });
-
-    await updateInventory();
-  };
-
-  const handleUploadClick = (item) => {
-    setCurrentItem(item);
-    document.getElementById(`fileInput-${item.name}`).click();
-  };
-
-  const handleSelectItem = (item) => {
-    setSelectedItems((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
-  };
-
-  const handleGenerateRecipes = async () => {
-    setLoading(true);
-    try {
-      const ingredients = selectedItems.join(",+");
-      console.log("Selected Ingredients: ", ingredients); // Debugging
-      const response = await axios.get(
-        `https://api.spoonacular.com/recipes/findByIngredients?ingredients=${ingredients}&number=5&apiKey=${NEXT_PUBLIC_SPOONACULAR_API_KEY}`
-      );
-      console.log("API Response: ", response.data); // Debugging
-      setRecipes(response.data);
-    } catch (error) {
-      console.error("Error fetching recipes: ", error);
-    }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -164,203 +62,147 @@ export default function Home() {
   );
 
   return (
-    <Container>
-      <Modal open={open} onClose={handleClose}>
-        <Box
-          position="absolute"
-          top="50%"
-          left="50%"
-          width={400}
-          bgcolor="white"
-          border="2px solid #000"
-          boxShadow={24}
-          p={4}
-          display="flex"
-          flexDirection="column"
-          gap={3}
-          sx={{ transform: "translate(-50%, -50%)" }}
+    <Container
+      sx={{
+        background: "linear-gradient(to right, #1e3c72, #2a5298)",
+        minHeight: "100vh",
+        paddingTop: "50px",
+        paddingBottom: "50px",
+      }}
+    >
+      <Typography
+        variant="h3"
+        align="center"
+        color="white"
+        gutterBottom
+        sx={{ fontWeight: "bold", letterSpacing: "3px", textShadow: "1px 1px 2px black" }}
+      >
+        StockSmart
+      </Typography>
+      <TextField
+        variant="outlined"
+        fullWidth
+        placeholder="Search items..."
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        sx={{
+          marginBottom: "20px",
+          backgroundColor: "#fff",
+          borderRadius: "5px",
+          boxShadow: "0 4px 8px rgba(0, 0, 0, 0.1)",
+        }}
+      />
+      <Box display="flex" justifyContent="center" mb={4}>
+        <Button
+          variant="contained"
+          sx={{
+            backgroundColor: "#5c67f2",
+            color: "#fff",
+            margin: "0 10px",
+            "&:hover": {
+              backgroundColor: "#424bf2",
+            },
+          }}
+          onClick={() => setOpen(true)}
         >
-          <Typography variant="h6">Add Item</Typography>
-          <Stack width="100%" direction="row" spacing={2}>
-            <TextField
-              variant="outlined"
-              fullWidth
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-            />
-            <Button
-              variant="outlined"
-              onClick={() => {
-                addItems(itemName);
-                setItemName("");
-                handleClose();
+          Add New Item
+        </Button>
+        <Button
+          variant="contained"
+          sx={{
+            backgroundColor: "#ff5f5f",
+            color: "#fff",
+            margin: "0 10px",
+            "&:hover": {
+              backgroundColor: "#f24444",
+            },
+          }}
+          onClick={clearInventory}
+        >
+          Clear Inventory
+        </Button>
+      </Box>
+      <Grid container spacing={4}>
+        {filteredInventory.map((item) => (
+          <Grid item xs={12} sm={6} md={3} key={item.name}>
+            <Card
+              sx={{
+                borderRadius: "15px",
+                boxShadow: "0 6px 18px rgba(0, 0, 0, 0.2)",
+                transition: "transform 0.3s",
+                "&:hover": { transform: "scale(1.05)" },
+                backgroundColor: "#f4f4f9",
               }}
             >
-              Add
-            </Button>
-          </Stack>
-        </Box>
-      </Modal>
-      <Container>
-        <Typography
-          variant="h3"
-          letterSpacing={5}
-          paddingTop="200px"
-          paddingLeft={52}
-          paddingRight={30}
-          paddingBottom={10}
-        >
-          StockSmart
-        </Typography>
-        <TextField
-          variant="outlined"
-          fullWidth
-          placeholder="Search items..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ marginBottom: "20px" }}
-        />
-      </Container>
-      <Box
-        display={"flex"}
-        flexDirection={"row"}
-        justifyContent={"center"}
-        alignItems={"center"}
-      >
-        <Box
-          display="flex"
-          justifyContent="center"
-          padding={2}
-          marginBottom={10}
-        >
-          <Button variant="outlined" onClick={() => handleOpen()}>
-            Add New Item
-          </Button>
-        </Box>
-        <Box
-          display="flex"
-          justifyContent="center"
-          padding={2}
-          marginBottom={10}
-        >
-          <Button variant="outlined" onClick={clearInventory}>
-            Clear Inventory
-          </Button>
-        </Box>
-      </Box>
-      <Container>
-        <Grid container>
-          {filteredInventory.map((item) => (
-            <Grid item xs={12} sm={6} md={3} key={item.name}>
-              <Card>
-                <CardContent>
-                  <Box
-                    display={"flex"}
-                    flexDirection={"column"}
-                    alignItems={"center"}
-                    gap={3}
-                  >
-                    <input
-                      type="file"
-                      id={`fileInput-${item.name}`}
-                      style={{ display: "none" }}
-                      accept="image/*"
-                      capture="camera"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      variant="outlined"
-                      onClick={() => handleUploadClick(item)}
-                    >
-                      Upload Image
-                    </Button>
-                    {item.imageUrl && (
-                      <img src={item.imageUrl} alt={item.name} width="100%" />
-                    )}
-                    <FormControlLabel
-                      control={
-                        <Checkbox
-                          checked={selectedItems.includes(item.name)}
-                          onChange={() => handleSelectItem(item.name)}
-                        />
-                      }
-                      label="Select"
-                    />
-                    <Typography variant="h5" textTransform={"capitalize"}>
-                      {item.name}
-                    </Typography>
-                    <Typography variant="h9">
-                      Quantity: {item.quantity}
-                    </Typography>
-                    <Box
-                      display={"flex"}
-                      flexDirection={"row"}
-                      justifyContent={"center"}
-                      gap={3}
-                    >
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={() => addItems(item.name)}
-                      >
-                        Add
-                      </Button>
-                      <Button
-                        variant="contained"
-                        color="secondary"
-                        onClick={() => removeItems(item.name)}
-                      >
-                        Remove
-                      </Button>
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-        <Box display="flex" justifyContent="center" mt={4}>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGenerateRecipes}
-            disabled={selectedItems.length === 0}
-          >
-            Generate Recipes
-          </Button>
-        </Box>
-        {loading && (
-          <Box display="flex" justifyContent="center" mt={4}>
-            <CircularProgress />
-          </Box>
-        )}
-        <Box mt={4}>
-          {recipes.map((recipe) => (
-            <Card key={recipe.id} sx={{ marginBottom: 2 }}>
               <CardContent>
-                <Typography variant="h6">{recipe.title}</Typography>
-                <img
-                  src={recipe.image}
-                  alt={recipe.title}
-                  style={{ width: "100%" }}
-                />
-                <Typography>Used Ingredients:</Typography>
-                <ul>
-                  {recipe.usedIngredients.map((ingredient) => (
-                    <li key={ingredient.id}>{ingredient.name}</li>
-                  ))}
-                </ul>
-                <Typography>Missed Ingredients:</Typography>
-                <ul>
-                  {recipe.missedIngredients.map((ingredient) => (
-                    <li key={ingredient.id}>{ingredient.name}</li>
-                  ))}
-                </ul>
+                <Box display="flex" flexDirection="column" alignItems="center">
+                  <input
+                    type="file"
+                    id={`fileInput-${item.name}`}
+                    style={{ display: "none" }}
+                    accept="image/*"
+                    capture="camera"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    variant="outlined"
+                    onClick={() => handleUploadClick(item)}
+                    sx={{
+                      backgroundColor: "#5c67f2",
+                      color: "#fff",
+                      "&:hover": { backgroundColor: "#424bf2" },
+                    }}
+                  >
+                    Upload Image
+                  </Button>
+                  {item.imageUrl && (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      style={{
+                        width: "100%",
+                        borderRadius: "10px",
+                        marginTop: "10px",
+                      }}
+                    />
+                  )}
+                  <Typography variant="h5" sx={{ textTransform: "capitalize", marginTop: "10px" }}>
+                    {item.name}
+                  </Typography>
+                  <Typography variant="body2">Quantity: {item.quantity}</Typography>
+                  <Box mt={2} display="flex" gap={2}>
+                    <Button variant="contained" onClick={() => addItems(item.name)}>
+                      Add
+                    </Button>
+                    <Button
+                      variant="contained"
+                      sx={{ backgroundColor: "#ff5f5f", "&:hover": { backgroundColor: "#f24444" } }}
+                      onClick={() => removeItems(item.name)}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                </Box>
               </CardContent>
             </Card>
-          ))}
+          </Grid>
+        ))}
+      </Grid>
+      <Box display="flex" justifyContent="center" mt={4}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleGenerateRecipes}
+          disabled={selectedItems.length === 0}
+        >
+          Generate Recipes
+        </Button>
+      </Box>
+      {loading && (
+        <Box display="flex" justifyContent="center" mt={4}>
+          <CircularProgress />
         </Box>
-      </Container>
+      )}
     </Container>
   );
 }
